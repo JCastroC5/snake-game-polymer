@@ -34,7 +34,8 @@
                 {x: 60, y: 20},
                 {x: 40, y: 20},
                 {x: 20, y: 20,}
-              ]
+              ],
+              isAlive: true
             }
           },
           directionMovement : {
@@ -46,6 +47,7 @@
             value: {
               x: 80,
               y: 100,
+              eaten: false
             }
           },
           score: {
@@ -57,19 +59,38 @@
 
       connectedCallback() {
         super.connectedCallback();
-        this.__drawLevel();
-        document.addEventListener('keydown', event => { this.changeDirection(event)});
+        document.addEventListener('keydown', event => {
+          setTimeout(() => {this.changeDirection(event)}, 200)
+        });
+        this.__startGame();
       }
 
-      __drawLevel(){
+      __startGame(){
         const canvas = this.$.canvas;
 
         if(canvas.getContext){
           const ctx = canvas.getContext('2d');
-          ctx.strokeRect(0, 0, canvas.width, canvas.height);
-          this.__drawFood(ctx);
-          this.__autoMove(ctx, canvas.width, canvas.height);
+          this.__updateGame(ctx, canvas.width, canvas.height);
         }
+      }
+
+      __updateGame(ctx, canvasWidth, canvasHeight){
+        let intervalId = 0;
+        intervalId = setInterval(() => {
+          if(this.snake.isAlive){
+            this.__clearLevel(ctx, canvasWidth, canvasHeight)
+            this.__moveSnake(canvasWidth, canvasHeight);
+            this.__drawLevel(ctx, canvasWidth, canvasHeight);
+          }else{
+            this.__stopGame(intervalId, ctx, canvasWidth, canvasHeight);
+          }
+        }, 300);
+      }
+
+      __drawLevel(ctx, canvasWidth, canvasHeight){
+        ctx.strokeRect(0, 0, canvasWidth, canvasWidth);
+        this.__drawSnake(ctx);
+        this.__drawFood(ctx, canvasWidth, canvasHeight);
       }
 
       __drawSnake(ctx) {
@@ -78,63 +99,63 @@
         }
       }
 
-      __drawFood(ctx) {
+      __drawFood(ctx, canvasWidth, canvasHeight) {
+        if(this.food.eaten){
+          const coords = this.__getNewCoords(canvasWidth, canvasHeight);
+
+          this.food.x = coords[0];
+          this.food.y = coords[1];
+
+          this.food.eaten = false;
+        }
+
         ctx.fillRect(this.food.x, this.food.y, 20, 20);
       }
 
-      __removeSnake(ctx, canvasWidth, canvasHeight){
+      __clearLevel(ctx, canvasWidth, canvasHeight){
         ctx.clearRect(0, 0, canvasWidth, canvasHeight);
         ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
       }
+      __moveSnake(canvasWidth, canvasHeight){
+        const newHead = {
+          x: this.snake.body[0].x + this.snake.dx,
+          y: this.snake.body[0].y + this.snake.dy
+        };
 
-      __autoMove(ctx, canvasWidth, canvasHeight) {
-        setInterval(() => {
-          this.__removeSnake(ctx, canvasWidth, canvasHeight);
+        this.snake.body.unshift(newHead);
+        this.snake.body.pop();
 
-          const newHead = {
-            x: this.snake.body[0].x + this.snake.dx,
-            y: this.snake.body[0].y + this.snake.dy
-          };
-
-          this.snake.body.unshift(newHead);
-          this.snake.body.pop();
-
-          for(const part of this.snake.body){
-            if(this.directionMovement === 'right'){
-              if(part.x === canvasWidth){
-                part.x = 0;
-              }
-            }
-
-            if(this.directionMovement === 'left'){
-              if(part.x < 0){
-                part.x = canvasWidth - 20;
-              }
-            }
-
-            if(this.directionMovement === 'up'){
-              if(part.y < 0){
-                part.y = canvasHeight- 20;
-              }
-            }
-
-            if(this.directionMovement === 'down'){
-              if(part.y === canvasHeight){
-                part.y = 0;
-              }
+        for(const part of this.snake.body){
+          if(this.directionMovement === 'right'){
+            if(part.x === canvasWidth){
+              part.x = 0;
             }
           }
 
-          if(newHead.x === this.food.x && newHead.y === this.food.y){
-            this.__eat(canvasWidth, canvasHeight);
+          if(this.directionMovement === 'left'){
+            if(part.x < 0){
+              part.x = canvasWidth - 20;
+            }
           }
 
+          if(this.directionMovement === 'up'){
+            if(part.y < 0){
+              part.y = canvasHeight- 20;
+            }
+          }
 
-          this.__drawSnake(ctx);
-          this.__drawFood(ctx);
+          if(this.directionMovement === 'down'){
+            if(part.y === canvasHeight){
+              part.y = 0;
+            }
+          }
+        }
 
-          this.__detectCollision();
-        }, 300);
+        if(newHead.x === this.food.x && newHead.y === this.food.y){
+          this.__eat();
+        }
+
+        this.__detectCollision();
       }
 
       __getNewCoords(canvasWidth, canvasHeight){
@@ -152,45 +173,33 @@
         return [newX, newY];
       }
 
-      __eat(canvasWidth, canvasHeight){
-        const coords = this.__getNewCoords(canvasWidth, canvasHeight);
-        const newX = coords[0];
-        const newY = coords[1];
+      __eat(){
+        this.food.eaten = true;
+        const newBodyPart = {x: 0, y: 0};
 
         if(this.directionMovement === 'right'){
-          this.snake.body = [{
-            x: this.snake.body[0].x + 20,
-            y: this.snake.body[0].y
-          },...this.snake.body];
+          newBodyPart.x = this.snake.body[this.snake.body.length - 1].x - 20;
+          newBodyPart.y = this.snake.body[this.snake.body.length - 1].y;
         }
 
         if(this.directionMovement === 'left'){
-          this.snake.body = [{
-            x: this.snake.body[0].x - 20,
-            y: this.snake.body[0].y
-          },...this.snake.body];
+          newBodyPart.x = this.snake.body[this.snake.body.length - 1].x + 20;
+          newBodyPart.y = this.snake.body[this.snake.body.length - 1].y;
         }
 
         if(this.directionMovement === 'up'){
-          this.snake.body = [{
-            x: this.snake.body[0].x,
-            y: this.snake.body[0].y - 20
-          },...this.snake.body];
+          newBodyPart.x = this.snake.body[this.snake.body.length - 1].x;
+          newBodyPart.y = this.snake.body[this.snake.body.length - 1].y + 20;
         }
 
         if(this.directionMovement === 'down'){
-          this.snake.body = [{
-            x: this.snake.body[0].x,
-            y: this.snake.body[0].y + 20
-          },...this.snake.body];
+          newBodyPart.x = this.snake.body[this.snake.body.length - 1].x;
+          newBodyPart.y = this.snake.body[this.snake.body.length - 1].y - 20;
         }
 
-        this.food.x = newX;
-        this.food.y = newY;
+        this.snake.body = [...this.snake.body, newBodyPart];
 
         this.score += 50;
-
-
       }
 
       changeDirection(event){
@@ -231,9 +240,14 @@
         for(let i = 1; i < this.snake.body.length; i++){
           if(this.snake.body[0].x === this.snake.body[i].x &&
           this.snake.body[0].y === this.snake.body[i].y) {
-            this.snake.body = [];
+            this.snake.isAlive = false;
           }
         }
+      }
+
+      __stopGame(intervalId, ctx, canvasWidth, canvasHeight){
+        clearInterval(intervalId);
+        this.__clearLevel(ctx, canvasWidth, canvasHeight)
       }
     }
 
