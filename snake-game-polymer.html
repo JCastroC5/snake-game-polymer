@@ -1,0 +1,242 @@
+<link rel="import" href="../polymer/polymer-element.html">
+
+<dom-module id="snake-game-polymer">
+  <template>
+    <style>
+      :host {
+        display: block;
+      }
+    </style>
+    <h3>Score: [[score]]</h3>
+    <canvas id="canvas" width="500" height="500"></canvas>
+  </template>
+
+  <script>
+    /**
+     * `snake-game-polymer`
+     * 
+     *
+     * @customElement
+     * @polymer
+     * @demo demo/index.html
+     */
+    class SnakeGamePolymer extends Polymer.Element {
+      static get is() { return 'snake-game-polymer'; }
+      static get properties() {
+        return {
+          snake: {
+            type: Object,
+            value: {
+              dx: 20,
+              dy: 0,
+              body: [
+                {x: 80, y: 20},
+                {x: 60, y: 20},
+                {x: 40, y: 20},
+                {x: 20, y: 20,}
+              ]
+            }
+          },
+          directionMovement : {
+            type: String,
+            value: 'right'
+          },
+          food: {
+            type: Object,
+            value: {
+              x: 80,
+              y: 100,
+            }
+          },
+          score: {
+            type: Number,
+            value: 0
+          }
+        };
+      }
+
+      connectedCallback() {
+        super.connectedCallback();
+        this.__drawLevel();
+        document.addEventListener('keydown', event => { this.changeDirection(event)});
+      }
+
+      __drawLevel(){
+        const canvas = this.$.canvas;
+
+        if(canvas.getContext){
+          const ctx = canvas.getContext('2d');
+          ctx.strokeRect(0, 0, canvas.width, canvas.height);
+          this.__drawFood(ctx);
+          this.__autoMove(ctx, canvas.width, canvas.height);
+        }
+      }
+
+      __drawSnake(ctx) {
+        for(const part of this.snake.body) {
+          ctx.strokeRect(part.x, part.y, 20, 20);
+        }
+      }
+
+      __drawFood(ctx) {
+        ctx.fillRect(this.food.x, this.food.y, 20, 20);
+      }
+
+      __removeSnake(ctx, canvasWidth, canvasHeight){
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        ctx.strokeRect(0, 0, canvasWidth, canvasHeight);
+      }
+
+      __autoMove(ctx, canvasWidth, canvasHeight) {
+        setInterval(() => {
+          this.__removeSnake(ctx, canvasWidth, canvasHeight);
+
+          const newHead = {
+            x: this.snake.body[0].x + this.snake.dx,
+            y: this.snake.body[0].y + this.snake.dy
+          };
+
+          this.snake.body.unshift(newHead);
+          this.snake.body.pop();
+
+          for(const part of this.snake.body){
+            if(this.directionMovement === 'right'){
+              if(part.x === canvasWidth){
+                part.x = 0;
+              }
+            }
+
+            if(this.directionMovement === 'left'){
+              if(part.x < 0){
+                part.x = canvasWidth - 20;
+              }
+            }
+
+            if(this.directionMovement === 'up'){
+              if(part.y < 0){
+                part.y = canvasHeight- 20;
+              }
+            }
+
+            if(this.directionMovement === 'down'){
+              if(part.y === canvasHeight){
+                part.y = 0;
+              }
+            }
+          }
+
+          if(newHead.x === this.food.x && newHead.y === this.food.y){
+            this.__eat(canvasWidth, canvasHeight);
+          }
+
+
+          this.__drawSnake(ctx);
+          this.__drawFood(ctx);
+
+          this.__detectCollision();
+        }, 300);
+      }
+
+      __getNewCoords(canvasWidth, canvasHeight){
+        let index = 0;
+        let newX = 0;
+        let newY = 0;
+
+        while(index > -1 ){
+          newX = (Math.floor(Math.random() * ((canvasWidth - 10) / 20))) * 20;
+          newY = (Math.floor(Math.random() * ((canvasHeight - 10) / 20))) * 20;
+
+          index = this.snake.body.findIndex(part => part.x === newX && part.y === newY);
+        }
+
+        return [newX, newY];
+      }
+
+      __eat(canvasWidth, canvasHeight){
+        const coords = this.__getNewCoords(canvasWidth, canvasHeight);
+        const newX = coords[0];
+        const newY = coords[1];
+
+        if(this.directionMovement === 'right'){
+          this.snake.body = [{
+            x: this.snake.body[0].x + 20,
+            y: this.snake.body[0].y
+          },...this.snake.body];
+        }
+
+        if(this.directionMovement === 'left'){
+          this.snake.body = [{
+            x: this.snake.body[0].x - 20,
+            y: this.snake.body[0].y
+          },...this.snake.body];
+        }
+
+        if(this.directionMovement === 'up'){
+          this.snake.body = [{
+            x: this.snake.body[0].x,
+            y: this.snake.body[0].y - 20
+          },...this.snake.body];
+        }
+
+        if(this.directionMovement === 'down'){
+          this.snake.body = [{
+            x: this.snake.body[0].x,
+            y: this.snake.body[0].y + 20
+          },...this.snake.body];
+        }
+
+        this.food.x = newX;
+        this.food.y = newY;
+
+        this.score += 50;
+
+
+      }
+
+      changeDirection(event){
+        if(event.target.id === 'up' || event.which === 38){
+          if(this.directionMovement !== 'up' && this.directionMovement !== 'down'){
+            this.directionMovement = 'up';
+            this.snake.dx = 0;
+            this.snake.dy = -20;
+          }
+        }
+
+        if(event.target.id === 'down' || event.which === 40){
+          if(this.directionMovement !== 'up' && this.directionMovement !== 'down'){
+            this.directionMovement = 'down';
+            this.snake.dx = 0;
+            this.snake.dy = 20;
+          }
+        }
+
+        if(event.target.id === 'right' || event.which === 39){
+          if(this.directionMovement !== 'right' && this.directionMovement !== 'left'){
+            this.directionMovement = 'right';
+            this.snake.dx = 20;
+            this.snake.dy = 0;
+          }
+        }
+
+        if(event.target.id === 'left' || event.which === 37){
+          if(this.directionMovement !== 'right' && this.directionMovement !== 'left'){
+            this.directionMovement = 'left';
+            this.snake.dx = -20;
+            this.snake.dy = 0;
+          }
+        }
+      }
+
+      __detectCollision(){
+        for(let i = 1; i < this.snake.body.length; i++){
+          if(this.snake.body[0].x === this.snake.body[i].x &&
+          this.snake.body[0].y === this.snake.body[i].y) {
+            this.snake.body = [];
+          }
+        }
+      }
+    }
+
+    window.customElements.define(SnakeGamePolymer.is, SnakeGamePolymer);
+  </script>
+</dom-module>
